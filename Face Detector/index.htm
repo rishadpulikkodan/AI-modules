@@ -1,0 +1,312 @@
+<!--
+Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+PDX-License-Identifier: MIT-0 (For details, see https://github.com/awsdocs/amazon-rekognition-developer-guide/blob/master/LICENSE-SAMPLECODE.)
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Face detector</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimum-scale=1.0, maximum-scale=1.0">
+  <script src="aws-sdk.min.js"></script>
+  <!-- <script src="https://sdk.amazonaws.com/js/aws-sdk-2.16.0.min.js"></script> -->
+<style type="text/css">
+  body{
+    margin:0px;
+    font-family: monospace;
+    font-size: 16px;
+  }
+
+table{
+  border-collapse:collapse;
+  
+}
+
+table,table td, table th{
+  border: 1px solid black;
+}
+table td{
+  padding-left: 25px;
+  padding-right:25px;
+}
+.p,#demo::selection {
+  color:black;
+  background:gray;
+}
+</style>
+</head>
+<body>
+<div 
+  id="prog" 
+  style="
+    top:0px;
+    width: 100%;
+    height: 100vh;
+    position: fixed;
+    transition:0.5s;
+    touch-action: none;
+    background:transparent;
+    display:none;
+  ">
+</div>
+
+<canvas id="canvas" height="1000" width="1000" style="display:none;">
+</canvas>
+
+<label for="fileToUpload">
+  <p align="center">image for temporary store only</p>
+  <div 
+    id="img"
+    style="
+      width:50vh;
+      height:50vh;
+      margin:auto;
+      transition:0.5s;
+      background-image:url('up.svg');
+      background-repeat:no-repeat;
+      background-size:contain;
+      background-position:center center;
+    " 
+  >
+    <div 
+      id="box" 
+      style="
+        transition: 1s;
+        width: 100%;
+        height: 100%;
+        border: 2px solid yellow;
+        border-radius: 25px;
+        display: inline-grid;
+    "></div>
+  </div>
+  <p 
+    align="center" 
+    style="
+      width: fit-content;
+      margin-left: auto;
+      margin-right: auto;
+      border: 2px solid green;
+      border-radius: 10px;
+      padding: 10px;
+      color: darkgreen;
+      background: darkseagreen;
+    " 
+    >Click to Upload a face image</p>
+</label>
+
+  <input style="display:none;" type="file" name="fileToUpload" id="fileToUpload" accept="image/*">
+  <div id="table"
+    style="
+      width:100%;
+      margin: auto;
+      overflow:scroll;
+    " 
+  ></div>
+
+  <div style="background:black;color:gray;font-size:14px;overflow:scroll;" id="demo"></div>
+<script>
+  document.getElementById("fileToUpload").addEventListener("change",function(event){
+    var prog = document.getElementById("prog");
+    prog.style.display = "block";
+    setTimeout(function(){
+      prog.style.backgroundColor = "#ffffffbf";
+      prog.style.backgroundRepeat = 'no-repeat';
+      prog.style.backgroundSize = 'contain';
+      prog.style.backgroundPosition = 'center center';
+      prog.style.backgroundImage = "url(up.gif)";
+    },10);
+    ProcessImage(this);
+  }, false);
+  //Calls DetectFaces API and shows estimated ages of detected faces
+  function DetectFaces(imageData,input){
+    AWS.region = "ap-south-1";
+    var rekognition = new AWS.Rekognition();
+    var params = {
+      Image:{Bytes:imageData},
+      Attributes:['ALL',]
+    };
+    rekognition.detectFaces(params, function (err, data){
+      var canvas = document.getElementById('canvas');
+      var ctx = canvas.getContext('2d');
+      var img = document.getElementById('img');
+      var box = document.getElementById('box');
+      var table = document.getElementById("table");
+      var demo = document.getElementById('demo');
+      var prog = document.getElementById("prog");
+      if(err){
+        clear();
+        console.log(err, err.stack);
+        alert("an error occurred eg:net");
+        progend();
+      }
+      else if(data.FaceDetails.length<1){
+        clear();
+        alert('0 faces');
+        progend();
+      }
+      else{
+        
+        if(input.files&&input.files[0]){
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            img.style.backgroundImage = "url("+e.target.result+")";
+            img.style.backgroundRepeat = 'no-repeat';
+            img.style.backgroundSize = 'contain';
+            img.style.backgroundPosition = 'center center';
+
+            var nimg = new Image();
+            nimg.onload = draw;
+            nimg.onerror = failed;
+            nimg.src = URL.createObjectURL(input.files[0]);
+
+              function draw() {
+                // canvas.width = this.width;
+                // canvas.height = this.height;
+                ctx.drawImage(this,0,0,1000,1000);
+                // ctx.drawImage(this,0,0);
+              }
+
+              function failed() {
+                console.error("The provided file couldn't be loaded as an Image media");
+                alert("The provided file couldn't be loaded as an Image media");
+              }
+
+          }
+          reader.readAsDataURL(input.files[0]); // convert to base64 string
+        }
+
+        table.innerHTML = " ";
+        var output = "<table><tr><th colspan='2'>1st face analyze</th></tr><tr><th>Contents</th><th>Values</th></tr>";
+
+        var face = data.FaceDetails['0'];
+        var fb = face.BoundingBox;
+
+        var l = ftos(fb.Left);
+        var t = ftos(fb.Top);
+        var w = ftos(fb.Width);
+        var h = ftos(fb.Height);
+
+        output += 
+        "<tr><td>Age</td><td>"+face.AgeRange.Low+" - "+face.AgeRange.High+"</td></tr>"+
+        "<tr><td>Beard</td><td>"+face.Beard.Value+"</td></tr>"+
+        "<tr><td>Confidence</td><td>"+face.Confidence+"</td></tr>"+
+        "<tr><td>Emotions</td><td>happy:"+face.Emotions[1].Confidence+"</td></tr>"+
+        "<tr><td>Eyeglasses</td><td>"+face.Eyeglasses.Value+"</td></tr>"+
+        "<tr><td>EyesOpen</td><td>"+face.EyesOpen.Value+"</td></tr>"+
+        "<tr><td>Gender</td><td>"+face.Gender.Value+"</td></tr>"+
+        "<tr><td>Landmarks</td><td>eyeLeft X:"+face.Landmarks[0].X+"</td></tr>"+
+        "<tr><td>MouthOpen</td><td>"+face.MouthOpen.Value+"</td></tr>"+
+        "<tr><td>Mustache</td><td>"+face.Mustache.Value+"</td></tr>"+
+        "<tr><td>Pose</td><td>p:"+face.Pose.Pitch+"<br>r:"+face.Pose.Roll+"<br>y:"+face.Pose.Yaw+"</td></tr>"+
+        "<tr><td>Quality</td><td>b:"+face.Quality.Brightness+"<br>s:"+face.Quality.Sharpness+"</td></tr>"+
+        "<tr><td>Smile</td><td>"+face.Smile.Value+"</td></tr>"+
+        "<tr><td>Sunglasses</td><td>"+face.Sunglasses.Value+"</td></tr>";
+
+        setTimeout(function(){
+
+          // for(var i=0;i<29;i++){ // drawing face dots to canvas
+          //   ctx.beginPath();
+          //   ctx.arc(lm(face.Landmarks[i].X),lm(face.Landmarks[i].Y),2,0,2* Math.PI);
+          //   ctx.fillStyle = "yellow";
+          //   ctx.fill();
+          // }
+
+          var fl = parseInt(w)/2;
+          fl = parseInt(l)+fl;
+          fl = fl.toString().slice(0,2);
+          var ft = parseInt(h)/4;
+          ft = parseInt(t)+ft;
+          ft = ft.toString().slice(0,2);
+          var hc = ctx.getImageData(l+'0',t+'0',1,1).data;
+          var fc = ctx.getImageData(fl+'0',ft+'0',1,1).data;
+
+          output += 
+          "<tr><td>Hair colour</td><td><text style='background:rgb("+hc[0]+','+hc[1]+','+hc[2]+");'>&nbsp;&nbsp;</text><text> rgb("+hc[0]+','+hc[1]+','+hc[2]+")</text></td></tr>"+
+          "<tr><td>Face colour</td><td><text style='background:rgb("+fc[0]+','+fc[1]+','+fc[2]+");'>&nbsp;&nbsp;</text><text> rgb("+fc[0]+','+fc[1]+','+fc[2]+")</text></td></tr>";
+          output += "</table>";
+          table.innerHTML = output;
+        },500);
+
+        box.style.opacity = "100%";
+        box.style.marginLeft = data.FaceDetails['0'].BoundingBox.Left.toString().slice(2,4) + '%';
+        box.style.marginTop = data.FaceDetails['0'].BoundingBox.Top.toString().slice(2,4) + '%';
+        box.style.width = data.FaceDetails['0'].BoundingBox.Width.toString().slice(2,4) + '%';
+        box.style.height = data.FaceDetails['0'].BoundingBox.Height.toString().slice(2,4) + '%';
+
+        var myJSON = JSON.stringify(data);
+        document.getElementById("demo").innerHTML = "<p class='p' align='center'>full json</p>"+myJSON;
+        function ftos(thi){return thi.toString().slice(2,4);}
+        function lm(thi){return thi.toString().slice(2,5);}
+        progend();
+      }
+    });
+  }
+  //Loads selected image and unencodes image bytes for Rekognition DetectFaces API
+  function ProcessImage(input) {
+    AnonLog();
+    var control = document.getElementById("fileToUpload");
+    var file = control.files[0];
+    // Load base64 encoded image 
+    var reader = new FileReader();
+    reader.onload = (function (theFile) {
+      return function (e) {
+        var img = document.createElement('img');
+        var image = null;
+        img.src = e.target.result;
+        var jpg = true;
+        try{ image = atob(e.target.result.split("data:image/jpeg;base64,")[1]);}
+        catch(e){jpg = false;}
+        if(jpg == false){
+          try{image = atob(e.target.result.split("data:image/png;base64,")[1]);}
+          catch(e){alert("Not an image file Rekognition can process"); return;}
+        }
+        //unencode image bytes for Rekognition DetectFaces API 
+        var length = image.length;
+        imageBytes = new ArrayBuffer(length);
+        var ua = new Uint8Array(imageBytes);
+        for (var i = 0; i < length; i++) {
+          ua[i] = image.charCodeAt(i);
+        }
+        //Call Rekognition  
+        DetectFaces(imageBytes,input);
+      };
+    })(file);
+    reader.readAsDataURL(file);
+
+  }
+  //Provides anonymous log on to AWS services
+  function AnonLog() {
+    // Configure the credentials provider to use your identity pool
+    AWS.config.region = 'ap-south-1'; // Region
+    AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+      IdentityPoolId: 'ap-south-1:7230f882-7435-4f50-b3db-1a2d351dcc18',
+    });
+    // Make the call to obtain credentials
+    AWS.config.credentials.get(function () {
+      // Credentials will be available when this function is called.
+      var accessKeyId = 'AKIAYMJPBJLWS7EIOXIL';
+      var secretAccessKey = '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';
+      var sessionToken = 'sessionToken';
+    });
+  }
+
+  function progend(){
+    prog.style.background = "transparent";
+    setTimeout(function(){
+      prog.style.display = "none";
+    },1000);
+  }
+  function clear(){
+    table.innerHTML = " ";
+    demo.innerHTML = " ";
+    img.style.backgroundImage = "url('up.svg')";
+    img.style.backgroundRepeat = 'no-repeat';
+    img.style.backgroundSize = 'contain';
+    img.style.backgroundPosition = 'center center';
+    box.style.margin = "0px"
+    box.style.width = "100%";
+    box.style.height = "100%";
+  }
+</script>
+</body>
+</html>

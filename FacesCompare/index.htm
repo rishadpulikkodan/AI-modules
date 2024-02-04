@@ -1,0 +1,145 @@
+<!--
+Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+PDX-License-Identifier: MIT-0 (For details, see https://github.com/awsdocs/amazon-rekognition-developer-guide/blob/master/LICENSE-SAMPLECODE.)
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>compareFaces</title>
+  <!-- <script src="aws-cognito-sdk.min.js"></script> -->
+  <!-- <script src="amazon-cognito-identity.min.js"></script> -->
+  <script src="aws-sdk.min.js"></script>
+  <!-- <script src="./app.js"></script> -->
+  <meta charset="UTF-8">
+  <link href="material.css" rel="stylesheet">
+</head>
+
+<body onload="progend();">
+<div id="prog" style="position:fixed;top:0px;left:0px;" role="progressbar" class="mdc-linear-progress mdc-linear-progress--indeterminate">
+    <div class="mdc-linear-progress__buffering-dots"></div>
+    <div class="mdc-linear-progress__buffer"></div>
+    <div class="mdc-linear-progress__bar mdc-linear-progress__primary-bar">
+    	<span class="mdc-linear-progress__bar-inner"></span>
+    </div>
+    <div class="mdc-linear-progress__bar mdc-linear-progress__secondary-bar">
+        <span class="mdc-linear-progress__bar-inner"></span>
+    </div>
+</div>
+  <p id="result">compareFaces</p>
+  <input onchange="ProcessImage('first');" id="a" type="file" accept="image/*">
+  <input onchange="ProcessImage('second');" id="b" type="file" accept="image/*">
+
+<div id="demoa" style="display:none;overflow-wrap:anywhere;"> </div>
+<div id="demob" style="display:none;overflow-wrap:anywhere;"> </div>
+
+<script>
+var 
+	prog=document.getElementById("prog"),
+	res=document.getElementById("result"),
+	demoa=document.getElementById("demoa"),
+	demob=document.getElementById("demob")
+;
+
+  //Calls DetectFaces API and shows estimated ages of detected faces
+  function DetectFaces(){
+    AWS.region = "ap-south-1";
+    var rekognition = new AWS.Rekognition();
+   // var paramsa = { Image:{Bytes:imageData}, Attributes:['ALL',] };
+
+  // rekognition.detectFaces(paramsa,function(err,data){
+  // if(err){ alert("an error occurred"); console.log(err, err.stack);progend(); }
+  // else if(data.FaceDetails.length<1){alert("0 faces");progend();}
+  // else{
+
+      var imageDataa = imgtogetbyte(demoa.innerHTML);
+      var imageDatab = imgtogetbyte(demob.innerHTML);
+      res.innerHTML = "..";
+
+			var params = {"SourceImage":{"Bytes":imageDataa},"TargetImage":{"Bytes":imageDatab},"SimilarityThreshold":70}
+			rekognition.compareFaces(params, function(err, data){
+			 if (err) {
+         res.innerHTML = err, err.stack;
+			   console.log(err, err.stack); // an error occurred
+			   progend();
+			 } else {
+        res.innerHTML = "...";
+
+        // alert("m= "+data.FaceMatches.length+"n= "+data.UnmatchedFaces.length);
+
+        if(data.FaceMatches.length<1){res.innerHTML="UnmatchedFaces";}
+        else{
+          var fdata = data.FaceMatches['0'];
+
+          res.innerHTML="1st faces :- <br> Similarity :"+data.FaceMatches['0'].Similarity.toString().slice(0,5)+" % Matches";
+        }
+        progend();
+			 }
+			});
+
+  // }
+  // });
+
+  }
+
+  //Loads selected image and unencodes image bytes for Rekognition DetectFaces API
+  function ProcessImage(thi){
+  	prog.style.display = "block";
+    AnonLog();
+    if(thi=='first'){var control = document.getElementById("a");}
+    else if(thi=='second'){var control = document.getElementById("b");}
+    var file = control.files[0];
+    // Load base64 encoded image 
+    var reader = new FileReader();
+    reader.onload = (function (theFile) {
+      return function (e) {
+        if(thi=='first'){demoa.innerHTML=e.target.result;}
+        else if(thi=='second'){demob.innerHTML=e.target.result;}
+        //Call Rekognition  
+        if(demoa.innerHTML != " " && demob.innerHTML != " "){
+          res.innerHTML = ".";
+          DetectFaces();
+        }
+        else{res.innerHTML = "upload next face"; progend(); }
+      };
+    })(file);
+    reader.readAsDataURL(file);
+  }
+
+  //Provides anonymous log on to AWS services
+function AnonLog(){
+  // Configure the credentials provider to use your identity pool
+  AWS.config.region = 'ap-south-1'; // Region
+  AWS.config.credentials = new AWS.CognitoIdentityCredentials({ IdentityPoolId: 'ap-south-1:7230f882-7435-4f50-b3db-1a2d351dcc18', });
+  // Make the call to obtain credentials
+  AWS.config.credentials.get(function () {
+    // Credentials will be available when this function is called.
+    var accessKeyId = 'AKIAYMJPBJLWS7EIOXIL';
+    var secretAccessKey = '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';
+    var sessionToken = 'sessionToken';
+  });
+}
+
+function imgtogetbyte(pimg){
+    var image = null,jpg = true;
+    try{image = atob(pimg.split("data:image/jpeg;base64,")[1]);}
+    catch(pimg){jpg=false;}
+    if(jpg==false){
+      try{image=atob(pimg.split("data:image/png;base64,")[1]);}
+      catch(pimg){
+        alert("Not a image file");
+        progend();
+        return;
+      }
+    }
+
+    var length=image.length;
+    imageData=new ArrayBuffer(length);
+    var ua=new Uint8Array(imageData);
+    for(var i=0;i<length;i++){ua[i] = image.charCodeAt(i);}
+    return imageData;
+}
+
+function progend(){prog.style.display="none";}
+</script>
+</body>
+</html>

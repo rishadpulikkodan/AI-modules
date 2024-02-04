@@ -1,0 +1,355 @@
+<!--
+Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+PDX-License-Identifier: MIT-0 (For details, see https://github.com/awsdocs/amazon-rekognition-developer-guide/blob/master/LICENSE-SAMPLECODE.)
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Face Recognition</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimum-scale=1.0, maximum-scale=1.0">
+  <script src="aws-sdk.min.js"></script>
+  <!-- <script src="https://sdk.amazonaws.com/js/aws-sdk-2.16.0.min.js"></script> -->
+<style type="text/css">
+  body{
+    margin:0px;
+    font-family: monospace;
+    font-size: 16px;
+    overflow-x: hidden;
+  }
+</style>
+</head>
+<body>
+
+<div 
+  id="prog" 
+  style="
+    top:0px;
+    width: 100%;
+    height: 100vh;
+    position: fixed;
+    transition: 1s;
+    touch-action: none;
+    background:transparent;
+    display:none;
+  "></div>
+
+<canvas id="canvasa" height="1000" width="1000" style="display:none;">
+</canvas>
+<canvas id="canvasb" height="1000" width="1000" style="display:none;">
+</canvas>
+
+<p 
+  id="face" 
+  align="center"
+  style="
+    font-size:25px;
+  " 
+  >Face comparison</p>
+
+<div 
+  style="
+    display:flex;
+  " 
+>
+  <div 
+    style="
+      width:50vw;
+    ">
+      <label for="fileFirstUpload">
+        <div 
+          id="imga"
+          style="
+            width:50vw;
+            height:50vw;
+            margin:auto;
+            transition:0.5s;
+            background-image:url('up.svg');
+            background-repeat:no-repeat;
+            background-size:contain;
+            background-position:center center;
+          " 
+        >
+        </div>
+        <p 
+          align="center" 
+          style="
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+            border: 2px solid green;
+            border-radius: 10px;
+            padding: 10px;
+            color: darkgreen;
+            background: darkseagreen;
+          " 
+          >First image</p>
+      </label>
+      <input style="display:none;" type="file" name="fileFirstUpload" id="fileFirstUpload" accept="image/*">
+      <div id="tablea"
+        style="
+          width: fit-content;
+          margin: auto;
+        " 
+      ></div>
+  </div>
+  <div 
+    style="
+      width:50vw;
+    ">
+      <label for="fileToUpload">
+        <div 
+          id="imgb"
+          style="
+            width:50vw;
+            height:50vw;
+            margin:auto;
+            transition:0.5s;
+            background-image:url('up.svg');
+            background-repeat:no-repeat;
+            background-size:contain;
+            background-position:center center;
+          " 
+        >
+        </div>
+        <p 
+          align="center" 
+          style="
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+            border: 2px solid green;
+            border-radius: 10px;
+            padding: 10px;
+            color: darkgreen;
+            background: darkseagreen;
+          " 
+          >Second image</p>
+      </label>
+      <input style="display:none;" type="file" name="fileToUpload" id="fileToUpload" accept="image/*">
+      <div id="tableb"
+        style="
+          width: fit-content;
+          margin: auto;
+          /*display:none;*/
+        " 
+      ></div>
+  </div>
+</div>
+<div id="result"></div>
+<script>
+  document.getElementById("fileFirstUpload").addEventListener("change",function(event){
+    var prog = document.getElementById("prog");
+    prog.style.display = "block";
+    setTimeout(function(){
+      prog.style.background = "#ffffffbf";
+    },10);
+    ProcessImage(this,"first");
+  }, false);
+  document.getElementById("fileToUpload").addEventListener("change",function(event){
+    var prog = document.getElementById("prog");
+    prog.style.display = "block";
+    setTimeout(function(){
+      prog.style.background = "#ffffffbf";
+    },10);
+    ProcessImage(this,"second");
+  }, false);
+
+  //Calls DetectFaces API and shows estimated ages of detected faces
+  function DetectFaces(imageData,input,val){
+    AWS.region = "ap-south-1";
+    var rekognition = new AWS.Rekognition();
+    var params = {
+      Image:{Bytes:imageData},
+      Attributes:['ALL',]
+    };
+    rekognition.detectFaces(params, function (err, data) {
+      if(val == "first"){
+        var img = document.getElementById('imga');
+        var table = document.getElementById("tablea");
+        var canvas = document.getElementById('canvasa');
+      }
+      else if(val == "second"){
+        var img = document.getElementById('imgb');
+        var table = document.getElementById("tableb");
+        var canvas = document.getElementById('canvasb');
+      }
+      var prog = document.getElementById("prog");
+      var ctx = canvas.getContext('2d');
+      if(err){
+        clear();
+        console.log(err, err.stack);
+        alert("an error occurred");
+        progend();
+      }
+      else if(data.FaceDetails.length<1){
+        clear();
+        alert('0 faces');
+        progend();
+      }
+      else{
+
+        if(input.files&&input.files[0]){
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            img.style.transition = '0.5s';
+            img.style.backgroundImage = "url("+e.target.result+")";
+            img.style.backgroundRepeat = 'no-repeat';
+            img.style.backgroundSize = 'contain';
+            img.style.backgroundPosition = 'center center';
+
+            var nimg = new Image();
+            nimg.onload = draw;
+            nimg.onerror = failed;
+            nimg.src = URL.createObjectURL(input.files[0]);
+
+              function draw() {
+                // canvas.width = this.width;
+                // canvas.height = this.height;
+                ctx.drawImage(this,0,0,1000,1000);
+                // ctx.drawImage(this,0,0);
+              }
+
+              function failed() {
+                console.error("The provided file couldn't be loaded as an Image media");
+                alert("The provided file couldn't be loaded as an Image media");
+              }
+
+          }
+          reader.readAsDataURL(input.files[0]); // convert to base64 string
+        }
+        table.innerHTML = " ";
+        var output = "<table><tr><th>Contents</th><th>Values</th></tr>";
+        var face = data.FaceDetails[0];
+
+        var fb = face.BoundingBox;
+
+        var l = ftos(fb.Left);
+        var t = ftos(fb.Top);
+        var w = ftos(fb.Width);
+        var h = ftos(fb.Height);
+
+        output += 
+        "<tr><td>Age</td><td>"+face.AgeRange.Low+" - "+face.AgeRange.High+"</td></tr>"+
+        "<tr><td>Beard</td><td>"+face.Beard.Value+"</td></tr>"+
+        "<tr><td>bc</td><td>"+face.Beard.Confidence+"</td></tr>"+
+        "<tr><td>Eyeglasses</td><td>"+face.Eyeglasses.Value+"</td></tr>"+
+        "<tr><td>EyesOpen</td><td>"+face.EyesOpen.Value+"</td></tr>"+
+        "<tr><td>Gender</td><td>"+face.Gender.Value+"</td></tr>"+
+        "<tr><td>MouthOpen</td><td>"+face.MouthOpen.Value+"</td></tr>"+
+        "<tr><td>Mustache</td><td>"+face.Mustache.Value+"</td></tr>"+
+        "<tr><td>mc</td><td>"+face.Mustache.Confidence+"</td></tr>"+
+        "<tr><td>Smile</td><td>"+face.Smile.Value+"</td></tr>"+
+        "<tr><td>Sunglasses</td><td>"+face.Sunglasses.Value+"</td></tr>";
+
+        setTimeout(function(){
+
+          // for(var i=0;i<29;i++){ // drawing face dots to canvas
+          //   ctx.beginPath();
+          //   ctx.arc(lm(face.Landmarks[i].X),lm(face.Landmarks[i].Y),2,0,2* Math.PI);
+          //   ctx.fillStyle = "yellow";
+          //   ctx.fill();
+          // }
+
+          var fl = parseInt(w)/2;
+          fl = parseInt(l)+fl;
+          fl = fl.toString().slice(0,3);
+          var ft = parseInt(h)/4;
+          ft = parseInt(t)+ft;
+          ft = ft.toString().slice(0,3);
+          var hc = ctx.getImageData(l,t,1,1).data;
+          var fc = ctx.getImageData(fl,ft,1,1).data;
+
+          output += 
+          "<tr><td>Hair colour</td><td><text style='background:rgb("+hc[0]+','+hc[1]+','+hc[2]+");'>&nbsp;&nbsp;</text><text> rgb("+hc[0]+','+hc[1]+','+hc[2]+")</text></td></tr>"+
+          "<tr><td>Face colour</td><td><text style='background:rgb("+fc[0]+','+fc[1]+','+fc[2]+");'>&nbsp;&nbsp;</text><text> rgb("+fc[0]+','+fc[1]+','+fc[2]+")</text></td></tr>";
+          output += "</table>";
+          table.innerHTML = output;
+        },500);
+
+        var tra = document.getElementById('tablea').innerHTML;
+        var trb = document.getElementById('tableb').innerHTML;
+        if(tra == trb){
+          document.getElementById('face').innerHTML = "same";
+        }
+        else{
+          document.getElementById('face').innerHTML = "deff";
+        }
+
+        progend();
+      }
+
+  function clear(){
+    table.innerHTML = " ";
+    img.style.backgroundImage = "url('up.svg')";
+    img.style.backgroundRepeat = 'no-repeat';
+    img.style.backgroundSize = 'contain';
+    img.style.backgroundPosition = 'center center';
+    // box.style.margin = "0px"
+    // box.style.width = "100%";
+    // box.style.height = "100%";
+  }
+
+    });
+  }
+
+
+  //Loads selected image and unencodes image bytes for Rekognition DetectFaces API
+  function ProcessImage(input,val){
+    AnonLog();
+    var control = input
+    var file = control.files[0];
+    // Load base64 encoded image 
+    var reader = new FileReader();
+    reader.onload = (function (theFile) {
+      return function (e) {
+        var img = document.createElement('img');
+        var image = null;
+        img.src = e.target.result;
+        var jpg = true;
+        try{ image = atob(e.target.result.split("data:image/jpeg;base64,")[1]);}
+        catch(e){jpg = false;}
+        if(jpg == false){
+          try{image = atob(e.target.result.split("data:image/png;base64,")[1]);}
+          catch(e){alert("Not an image file Rekognition can process"); return;}
+        }
+        //unencode image bytes for Rekognition DetectFaces API 
+        var length = image.length;
+        imageBytes = new ArrayBuffer(length);
+        var ua = new Uint8Array(imageBytes);
+        for (var i = 0; i < length; i++) {
+          ua[i] = image.charCodeAt(i);
+        }
+        //Call Rekognition  
+        DetectFaces(imageBytes,input,val);
+      };
+    })(file);
+    reader.readAsDataURL(file);
+
+  }
+  //Provides anonymous log on to AWS services
+  function AnonLog() {
+    // Configure the credentials provider to use your identity pool
+    AWS.config.region = 'ap-south-1'; // Region
+    AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+      IdentityPoolId: 'ap-south-1:7230f882-7435-4f50-b3db-1a2d351dcc18',
+    });
+    // Make the call to obtain credentials
+    AWS.config.credentials.get(function () {
+      // Credentials will be available when this function is called.
+      var accessKeyId = 'AKIAYMJPBJLWS7EIOXIL';
+      var secretAccessKey = '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';
+      var sessionToken = 'sessionToken';
+    });
+  }
+  function progend(){
+    prog.style.background = "transparent";
+    setTimeout(function(){
+      prog.style.display = "none";
+    },1000);
+  }
+  function ftos(thi){return thi.toString().slice(2,5);}
+
+</script>
+</body>
+</html>
